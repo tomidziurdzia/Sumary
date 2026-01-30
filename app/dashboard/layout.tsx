@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { LogoutButton } from "@/components/logout-button";
+import { Suspense } from "react";
 
-export default async function DashboardLayout({
+async function DashboardLayoutInner({
   children,
 }: {
   children: React.ReactNode;
@@ -41,5 +42,23 @@ export default async function DashboardLayout({
       </nav>
       <div className="flex-1 max-w-5xl w-full mx-auto p-6">{children}</div>
     </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </Suspense>
   );
 }
