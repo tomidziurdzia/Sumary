@@ -27,3 +27,24 @@ export type UpdateTransactionParams = {
   description?: string;
   amount?: number;
 };
+
+export type InsightsData = {
+  totalTransactions: number;
+  totalIncome: number;
+  totalExpense: number;
+  netAmount: number;
+  byAccount: {
+    account_no: string;
+    count: number;
+    income: number;
+    expense: number;
+    sum: number;
+  }[];
+  monthly: {
+    month: string;
+    year: number;
+    income: number;
+    expense: number;
+  }[];
+  last7DaysCount: number;
+};

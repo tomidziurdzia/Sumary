@@ -3,13 +3,67 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   GetTransactionsParams,
+  InsightsData,
   UpdateTransactionParams,
   type Transaction,
 } from "@/lib/types";
 
+const TRANSACTION_COLUMNS =
+  "id,date,account_no,description,amount,created_at" as const;
+const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_SORT = "date" as const satisfies GetTransactionsParams["sortBy"];
+const DEFAULT_SORT_DIR =
+  "desc" as const satisfies GetTransactionsParams["sortDir"];
+
+type RowForInsights = {
+  amount: number | null;
+  account_no: string | null;
+  date: string | null;
+};
+
+function splitAmount(amount: number): { income: number; expense: number } {
+  if (amount >= 0) return { income: amount, expense: 0 };
+  return { income: 0, expense: Math.abs(amount) };
+}
+
+function getMonthKey(dateStr: string): string | null {
+  const [y, m] = dateStr.split("-");
+  if (!y || !m) return null;
+  return `${y}-${m}`;
+}
+
+function buildLast12Months(
+  monthlyMap: Map<string, { income: number; expense: number }>
+): InsightsData["monthly"] {
+  const result: InsightsData["monthly"] = [];
+  const now = new Date();
+
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const key = `${year}-${String(month).padStart(2, "0")}`;
+    const values = monthlyMap.get(key) ?? { income: 0, expense: 0 };
+
+    result.push({
+      month: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      year,
+      income: values.income,
+      expense: values.expense,
+    });
+  }
+
+  return result;
+}
+
+function getCutoffDateDaysAgo(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().split("T")[0];
+}
+
 export async function getTransactions(params: GetTransactionsParams = {}) {
   const supabase = await createClient();
-
   const {
     search,
     accountNo,
@@ -17,40 +71,37 @@ export async function getTransactions(params: GetTransactionsParams = {}) {
     toDate,
     minAmount,
     maxAmount,
-    sortBy = "date",
-    sortDir = "desc",
+    sortBy = DEFAULT_SORT,
+    sortDir = DEFAULT_SORT_DIR,
     page = 1,
-    pageSize = 20,
+    pageSize = DEFAULT_PAGE_SIZE,
   } = params;
 
   let query = supabase
     .from("transactions")
-    .select("id,date,account_no,description,amount,created_at", {
-      count: "exact",
-    });
+    .select(TRANSACTION_COLUMNS, { count: "exact" });
 
   if (search) {
     query = query.or(
       `description.ilike.%${search}%,account_no.ilike.%${search}%`
     );
   }
-
   if (accountNo) query = query.eq("account_no", accountNo);
   if (fromDate) query = query.gte("date", fromDate);
   if (toDate) query = query.lte("date", toDate);
   if (minAmount !== undefined) query = query.gte("amount", minAmount);
   if (maxAmount !== undefined) query = query.lte("amount", maxAmount);
 
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
+  const rangeStart = (page - 1) * pageSize;
+  const rangeEnd = rangeStart + pageSize - 1;
 
+  const orderColumn: "date" | "amount" | "account_no" | "created_at" =
+    sortBy ?? DEFAULT_SORT;
   const { data, error, count } = await query
-    .order(sortBy, { ascending: sortDir === "asc" })
-    .range(from, to);
+    .order(orderColumn, { ascending: sortDir === "asc" })
+    .range(rangeStart, rangeEnd);
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   return { data: data ?? [], count: count ?? 0 };
 }
@@ -60,32 +111,42 @@ export async function updateTransaction(
 ): Promise<Transaction> {
   const supabase = await createClient();
   const { id, ...updates } = params;
-  const clean: Record<string, unknown> = {};
-  if (updates.date !== undefined) clean.date = updates.date;
-  if (updates.account_no !== undefined) clean.account_no = updates.account_no;
-  if (updates.description !== undefined)
-    clean.description = updates.description;
-  if (updates.amount !== undefined) clean.amount = updates.amount;
-  if (Object.keys(clean).length === 0) {
-    const { data: existing } = await supabase
+
+  const allowedFields = [
+    "date",
+    "account_no",
+    "description",
+    "amount",
+  ] as const;
+  const payload: Record<string, unknown> = {};
+
+  for (const key of allowedFields) {
+    const value = updates[key];
+    if (value !== undefined) payload[key] = value;
+  }
+
+  if (Object.keys(payload).length === 0) {
+    const { data: existing, error } = await supabase
       .from("transactions")
-      .select("id,date,account_no,description,amount,created_at")
+      .select(TRANSACTION_COLUMNS)
       .eq("id", id)
       .single();
-    if (!existing) throw new Error("Transaction not found");
+    if (error || !existing) throw new Error("Transaction not found");
     return existing as Transaction;
   }
+
   const { data, error } = await supabase
     .from("transactions")
-    .update(clean)
+    .update(payload)
     .eq("id", id)
-    .select("id,date,account_no,description,amount,created_at")
+    .select(TRANSACTION_COLUMNS)
     .single();
+
   if (error) throw new Error(error.message);
   return data as Transaction;
 }
 
-export async function getTransactionAccounts() {
+export async function getTransactionAccounts(): Promise<string[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("transactions")
@@ -94,37 +155,25 @@ export async function getTransactionAccounts() {
 
   if (error) throw new Error(error.message);
 
-  const accounts = [...new Set((data ?? []).map((r) => r.account_no))];
+  const accounts = [
+    ...new Set(
+      (data ?? [])
+        .map((r) => r.account_no)
+        .filter((a): a is string => a != null)
+    ),
+  ];
   return accounts;
 }
 
-export type InsightsData = {
-  totalTransactions: number;
-  totalIncome: number;
-  totalExpense: number;
-  netAmount: number;
-  byAccount: {
-    account_no: string;
-    count: number;
-    income: number;
-    expense: number;
-    sum: number;
-  }[];
-  monthly: { month: string; year: number; income: number; expense: number }[];
-  last7DaysCount: number;
-};
-
 export async function getInsights(): Promise<InsightsData> {
   const supabase = await createClient();
-
-  const { data: all, error: errAll } = await supabase
+  const { data: rows, error } = await supabase
     .from("transactions")
-    .select("id,amount,account_no,date");
+    .select("id, amount, account_no, date");
 
-  if (errAll) throw new Error(errAll.message);
+  if (error) throw new Error(error.message);
 
-  const rows = all ?? [];
-  const totalTransactions = rows.length;
+  const list = (rows ?? []) as RowForInsights[];
 
   let totalIncome = 0;
   let totalExpense = 0;
@@ -134,35 +183,34 @@ export async function getInsights(): Promise<InsightsData> {
   >();
   const monthlyMap = new Map<string, { income: number; expense: number }>();
 
-  for (const r of rows) {
-    const amount = r.amount ?? 0;
-    const isIncome = amount >= 0;
-    const income = isIncome ? amount : 0;
-    const expense = isIncome ? 0 : Math.abs(amount);
+  for (const row of list) {
+    const amount = row.amount ?? 0;
+    const { income, expense } = splitAmount(amount);
     totalIncome += income;
     totalExpense += expense;
 
-    const accKey = r.account_no ?? "";
-    const acc = byAccountMap.get(accKey) ?? {
+    const accountNo = row.account_no ?? "";
+    const prev = byAccountMap.get(accountNo) ?? {
       count: 0,
       income: 0,
       expense: 0,
       sum: 0,
     };
-    acc.count += 1;
-    acc.income += income;
-    acc.expense += expense;
-    acc.sum += amount;
-    byAccountMap.set(accKey, acc);
+    byAccountMap.set(accountNo, {
+      count: prev.count + 1,
+      income: prev.income + income,
+      expense: prev.expense + expense,
+      sum: prev.sum + amount,
+    });
 
-    const dateStr = r.date ?? "";
-    if (dateStr) {
-      const [y, m] = dateStr.split("-");
-      const monthKey = `${y}-${m}`;
-      const mon = monthlyMap.get(monthKey) ?? { income: 0, expense: 0 };
-      mon.income += income;
-      mon.expense += expense;
-      monthlyMap.set(monthKey, mon);
+    const dateStr = row.date ?? "";
+    const monthKey = dateStr ? getMonthKey(dateStr) : null;
+    if (monthKey) {
+      const prevMonth = monthlyMap.get(monthKey) ?? { income: 0, expense: 0 };
+      monthlyMap.set(monthKey, {
+        income: prevMonth.income + income,
+        expense: prevMonth.expense + expense,
+      });
     }
   }
 
@@ -170,37 +218,12 @@ export async function getInsights(): Promise<InsightsData> {
     .map(([account_no, v]) => ({ account_no, ...v }))
     .sort((a, b) => Math.abs(b.sum) - Math.abs(a.sum));
 
-  const now = new Date();
-  const monthly: {
-    month: string;
-    year: number;
-    income: number;
-    expense: number;
-  }[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
-    const key = `${y}-${String(m).padStart(2, "0")}`;
-    const v = monthlyMap.get(key) ?? { income: 0, expense: 0 };
-    monthly.push({
-      month: d.toLocaleDateString("en-US", {
-        month: "short",
-        year: "numeric",
-      }),
-      year: y,
-      income: v.income,
-      expense: v.expense,
-    });
-  }
-
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const cutoff = sevenDaysAgo.toISOString().split("T")[0];
-  const last7DaysCount = rows.filter((r) => (r.date ?? "") >= cutoff).length;
+  const monthly = buildLast12Months(monthlyMap);
+  const cutoff = getCutoffDateDaysAgo(7);
+  const last7DaysCount = list.filter((r) => (r.date ?? "") >= cutoff).length;
 
   return {
-    totalTransactions,
+    totalTransactions: list.length,
     totalIncome,
     totalExpense,
     netAmount: totalIncome - totalExpense,

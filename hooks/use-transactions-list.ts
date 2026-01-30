@@ -12,7 +12,7 @@ import { useState, useMemo } from "react";
 import { usePagination } from "@/hooks/use-pagination";
 import { useTransactionFilters } from "@/hooks/use-transaction-filters";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export function useTransactionsList() {
   const [page, setPage] = useState(1);
@@ -48,20 +48,26 @@ export function useTransactionsList() {
         data: Transaction[];
         count: number;
       }>(["transactions", params]);
-      queryClient.setQueryData(["transactions", params], (old: typeof previousData) => {
-        if (!old) return old;
-        return {
-          ...old,
-          data: old.data.map((tx) =>
-            tx.id === payload.id ? { ...tx, ...payload } : tx
-          ),
-        };
-      });
+      queryClient.setQueryData(
+        ["transactions", params],
+        (old: typeof previousData) => {
+          if (!old) return old;
+          return {
+            ...old,
+            data: old.data.map((tx) =>
+              tx.id === payload.id ? { ...tx, ...payload } : tx
+            ),
+          };
+        }
+      );
       return { previousData };
     },
     onError: (_err, _payload, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(["transactions", params], context.previousData);
+        queryClient.setQueryData(
+          ["transactions", params],
+          context.previousData
+        );
       }
     },
     onSettled: () => {
