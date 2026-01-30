@@ -10,7 +10,7 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Financial Dashboard",
-  description: "Dashboard financiero con Magic Link y Supabase",
+  description: "Financial dashboard with Magic Link and Supabase",
 };
 
 const geistSans = Geist({

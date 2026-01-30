@@ -15,7 +15,7 @@ export default function DashboardLayout({
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/" className="text-muted-foreground hover:text-foreground">
-              Inicio
+              Home
             </Link>
             <LogoutButton />
           </div>

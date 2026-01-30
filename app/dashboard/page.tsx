@@ -14,7 +14,7 @@ async function Dashboard() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <p className="text-muted-foreground">
-        Has iniciado sesión con Magic Link. Aquí irá la tabla de transacciones.
+        You're signed in with Magic Link. The transactions table will go here.
       </p>
     </div>
   );

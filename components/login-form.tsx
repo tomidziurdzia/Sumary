@@ -44,7 +44,7 @@ export function LoginForm({
       if (signInError) throw signInError;
       setEmailSent(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Ha ocurrido un error");
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -54,9 +54,9 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Iniciar sesión</CardTitle>
+          <CardTitle className="text-2xl">Sign in</CardTitle>
           <CardDescription>
-            Introduce tu email y te enviaremos un enlace mágico (sin contraseña)
+            Enter your email and we&apos;ll send you a magic link (no password)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -67,7 +67,7 @@ export function LoginForm({
                 <Input
                   id="email"
                   type="email"
-                  placeholder="tu@email.com"
+                  placeholder="you@example.com"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -76,30 +76,24 @@ export function LoginForm({
               </div>
               {emailSent ? (
                 <p className="text-sm text-green-600 dark:text-green-400">
-                  Revisa tu correo y haz clic en el enlace para iniciar sesión.
+                  Check your email and click the link to sign in.
                 </p>
               ) : (
                 <>
-                  {error && (
-                    <p className="text-sm text-red-500">{error}</p>
-                  )}
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Enviando enlace..." : "Enviar enlace mágico"}
+                  {error && <p className="text-sm text-red-500">{error}</p>}
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Sending link..." : "Send magic link"}
                   </Button>
                 </>
               )}
             </div>
             <div className="mt-4 text-center text-sm">
-              ¿No tienes cuenta?{" "}
+              Don&apos;t have an account?{" "}
               <Link
                 href="/auth/sign-up"
                 className="underline underline-offset-4"
               >
-                Regístrate
+                Sign up
               </Link>
             </div>
           </form>
