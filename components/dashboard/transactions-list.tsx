@@ -34,7 +34,8 @@ export function TransactionsList() {
     totalPages,
     from,
     to,
-    setPage,
+    nextPage,
+    prevPage,
     updateMutation,
     PAGE_SIZE,
   } = useTransactionsList();
@@ -120,8 +121,8 @@ export function TransactionsList() {
             <TransactionsPagination
               page={page}
               totalPages={totalPages}
-              onPrevious={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onPrevious={prevPage}
+              onNext={nextPage}
             />
           )}
         </>
