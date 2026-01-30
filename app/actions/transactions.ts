@@ -44,13 +44,22 @@ export async function getTransactions(params: GetTransactionsParams = {}) {
     .order(sortBy, { ascending: sortDir === "asc" })
     .range(from, to);
 
-  console.log(data);
-  console.log(error);
-  console.log(count);
-
   if (error) {
     throw new Error(error.message);
   }
 
   return { data: data ?? [], count: count ?? 0 };
+}
+
+export async function getTransactionAccounts() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("account_no")
+    .order("account_no");
+
+  if (error) throw new Error(error.message);
+
+  const accounts = [...new Set((data ?? []).map((r) => r.account_no))];
+  return accounts;
 }
