@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Suspense } from "react";
+import { TransactionsList } from "@/components/dashboard/transactions-list";
 
 async function Dashboard() {
   const supabase = await createClient();
@@ -13,9 +14,7 @@ async function Dashboard() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <p className="text-muted-foreground">
-        You're signed in with Magic Link. The transactions table will go here.
-      </p>
+      <TransactionsList />
     </div>
   );
 }

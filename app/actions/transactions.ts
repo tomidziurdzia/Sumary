@@ -44,6 +44,10 @@ export async function getTransactions(params: GetTransactionsParams = {}) {
     .order(sortBy, { ascending: sortDir === "asc" })
     .range(from, to);
 
+  console.log(data);
+  console.log(error);
+  console.log(count);
+
   if (error) {
     throw new Error(error.message);
   }
