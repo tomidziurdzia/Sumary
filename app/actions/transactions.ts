@@ -1,7 +1,11 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { GetTransactionsParams } from "@/lib/types";
+import {
+  GetTransactionsParams,
+  UpdateTransactionParams,
+  type Transaction,
+} from "@/lib/types";
 
 export async function getTransactions(params: GetTransactionsParams = {}) {
   const supabase = await createClient();
@@ -49,6 +53,36 @@ export async function getTransactions(params: GetTransactionsParams = {}) {
   }
 
   return { data: data ?? [], count: count ?? 0 };
+}
+
+export async function updateTransaction(
+  params: UpdateTransactionParams
+): Promise<Transaction> {
+  const supabase = await createClient();
+  const { id, ...updates } = params;
+  const clean: Record<string, unknown> = {};
+  if (updates.date !== undefined) clean.date = updates.date;
+  if (updates.account_no !== undefined) clean.account_no = updates.account_no;
+  if (updates.description !== undefined)
+    clean.description = updates.description;
+  if (updates.amount !== undefined) clean.amount = updates.amount;
+  if (Object.keys(clean).length === 0) {
+    const { data: existing } = await supabase
+      .from("transactions")
+      .select("id,date,account_no,description,amount,created_at")
+      .eq("id", id)
+      .single();
+    if (!existing) throw new Error("Transaction not found");
+    return existing as Transaction;
+  }
+  const { data, error } = await supabase
+    .from("transactions")
+    .update(clean)
+    .eq("id", id)
+    .select("id,date,account_no,description,amount,created_at")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as Transaction;
 }
 
 export async function getTransactionAccounts() {

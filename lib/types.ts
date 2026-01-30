@@ -19,3 +19,11 @@ export type GetTransactionsParams = {
   page?: number;
   pageSize?: number;
 };
+
+export type UpdateTransactionParams = {
+  id: string;
+  date?: string;
+  account_no?: string;
+  description?: string;
+  amount?: number;
+};

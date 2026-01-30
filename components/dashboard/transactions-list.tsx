@@ -1,11 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getTransactions,
   getTransactionAccounts,
+  updateTransaction,
 } from "@/app/actions/transactions";
 import type { GetTransactionsParams } from "@/lib/types";
+import type { Transaction } from "@/lib/types";
 import {
   Table,
   TableBody,
@@ -40,10 +42,42 @@ export function TransactionsList() {
     [page, search, accountNo]
   );
 
+  const queryClient = useQueryClient();
+
   const { data, isFetching, isError, error, refetch } = useQuery({
     queryKey: ["transactions", params],
     queryFn: () => getTransactions(params),
     placeholderData: (previousData) => previousData,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: updateTransaction,
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ["transactions", params] });
+      const previousData = queryClient.getQueryData<{
+        data: Transaction[];
+        count: number;
+      }>(["transactions", params]);
+      queryClient.setQueryData(["transactions", params], (old: typeof previousData) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((tx) =>
+            tx.id === payload.id ? { ...tx, ...payload } : tx
+          ),
+        };
+      });
+      return { previousData };
+    },
+    onError: (_err, _payload, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(["transactions", params], context.previousData);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transaction-accounts"] });
+    },
   });
 
   const { data: accounts = [] } = useQuery({
@@ -132,11 +166,19 @@ export function TransactionsList() {
                   <TableHead>Account</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="w-0"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {transactions.map((tx) => (
-                  <TransactionRow key={tx.id} transaction={tx} />
+                  <TransactionRow
+                    key={tx.id}
+                    transaction={tx}
+                    onUpdate={(id, updates) =>
+                      updateMutation.mutate({ id, ...updates })
+                    }
+                    isUpdating={updateMutation.isPending}
+                  />
                 ))}
               </TableBody>
             </Table>
