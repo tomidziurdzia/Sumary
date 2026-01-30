@@ -1,11 +1,20 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { LogoutButton } from "@/components/logout-button";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+
+  if (!data?.user) {
+    redirect("/auth/login");
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <nav className="w-full border-b h-14 flex items-center px-4">
@@ -14,7 +23,16 @@ export default function DashboardLayout({
             Financial Dashboard
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-muted-foreground hover:text-foreground">
+            <Link
+              href="/dashboard/insights"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Insights
+            </Link>
+            <Link
+              href="/dashboard"
+              className="text-muted-foreground hover:text-foreground"
+            >
               Home
             </Link>
             <LogoutButton />
