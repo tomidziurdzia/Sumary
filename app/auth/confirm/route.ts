@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // Flujo PKCE: Supabase envía "code" en la URL (Magic Link actual)
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
@@ -21,7 +20,6 @@ export async function GET(request: NextRequest) {
     redirect(`/auth/error?error=${encodeURIComponent(error.message)}`);
   }
 
-  // Flujo legacy: token_hash + type
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({
       type,

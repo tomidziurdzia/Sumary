@@ -93,7 +93,6 @@ async function InsightsContent() {
         </Card>
       </div>
 
-      {/* By account: income vs expense */}
       <Card>
         <CardHeader>
           <CardTitle>By account</CardTitle>
@@ -142,7 +141,6 @@ async function InsightsContent() {
         </CardContent>
       </Card>
 
-      {/* Monthly summary */}
       <Card>
         <CardHeader>
           <CardTitle>Monthly summary</CardTitle>
